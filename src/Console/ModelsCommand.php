@@ -1,15 +1,6 @@
 <?php
 
-/**
- * Laravel IDE Helper Generator
- *
- * @author    Barry vd. Heuvel <barryvdh@gmail.com>
- * @copyright 2014 Barry vd. Heuvel / Fruitcake Studio (http://www.fruitcakestudio.nl)
- * @license   http://www.opensource.org/licenses/mit-license.php MIT
- * @link      https://github.com/barryvdh/laravel-ide-helper
- */
-
-namespace Barryvdh\LaravelIdeHelper\Console;
+namespace App\Console\Commands;
 
 use Barryvdh\LaravelIdeHelper\Contracts\ModelHookInterface;
 use Barryvdh\LaravelIdeHelper\Parsers\PhpDocReturnTypeParser;
@@ -41,7 +32,6 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Database\Schema\Builder;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
@@ -56,12 +46,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Throwable;
 
-/**
- * A command to generate autocomplete information for your IDE
- *
- * @author Barry vd. Heuvel <barryvdh@gmail.com>
- */
-class ModelsCommand extends Command
+class PhpDocCommand extends Command
 {
     protected const RELATION_TYPES = [
         'hasMany' => HasMany::class,
@@ -144,6 +129,7 @@ class ModelsCommand extends Command
      */
     public function handle()
     {
+//        dd(123);
         $this->filename = $this->laravel['config']->get('ide-helper.models_filename', '_ide_helper_models.php');
         $filename = $this->option('filename') ?? $this->filename;
         $this->write = $this->option('write');
@@ -382,7 +368,6 @@ class ModelsCommand extends Command
                     break;
                 case 'decimal':
                 case 'string':
-                case 'hashed':
                     $realType = 'string';
                     break;
                 case 'array':
@@ -501,17 +486,25 @@ class ModelsCommand extends Command
      */
     public function getPropertiesFromTable($model)
     {
-        $table = $model->getTable();
-        $schema = $model->getConnection()->getSchemaBuilder();
-        $columns = $schema->getColumns($table);
-        $driverName = $model->getConnection()->getDriverName();
+        $connection = $model->getConnection();
+        $connection->useDefaultSchemaGrammar();
+        $grammar = $connection->getSchemaGrammar();
 
+        $table = $connection->getTablePrefix().$model->getTable();
+        $arr = \explode('.', $table);
+        $schemaName = $arr[0];
+        $tableName = $arr[1];
+
+        $results = $connection->selectFromWriteConnection(
+            $grammar->compileColumns($schemaName, $tableName)
+        );
+        $columns = $connection->getPostProcessor()->processColumns($results);
 
         if (!$columns) {
             return;
         }
 
-        $this->setForeignKeys($schema, $table);
+        $this->setForeignKeys($connection, $arr);
         foreach ($columns as $column) {
             $name = $column['name'];
             if (in_array($name, $model->getDates())) {
@@ -573,11 +566,11 @@ class ModelsCommand extends Command
             // methods that resemble mutators but aren't.
             $reflections = array_filter($reflections, function (\ReflectionMethod $methodReflection) {
                 return !$methodReflection->isPrivate() && !(
-                    $methodReflection->getDeclaringClass()->getName() === Model::class && (
-                        $methodReflection->getName() === 'setClassCastableAttribute' ||
-                        $methodReflection->getName() === 'setEnumCastableAttribute'
-                    )
-                );
+                        $methodReflection->getDeclaringClass()->getName() === Model::class && (
+                            $methodReflection->getName() === 'setClassCastableAttribute' ||
+                            $methodReflection->getName() === 'setEnumCastableAttribute'
+                        )
+                    );
             });
             sort($reflections);
             foreach ($reflections as $reflection) {
@@ -743,7 +736,7 @@ class ModelsCommand extends Command
                                             'int|null',
                                             true,
                                             false
-                                            // What kind of comments should be added to the relation count here?
+                                        // What kind of comments should be added to the relation count here?
                                         );
                                     }
                                 } elseif (
@@ -1663,13 +1656,19 @@ class ModelsCommand extends Command
         }
     }
 
-    /**
-     * @param Builder $schema
-     * @param string $table
-     */
-    protected function setForeignKeys($schema, $table)
+    protected function setForeignKeys($connection, $arr)
     {
-        foreach ($schema->getForeignKeys($table) as $foreignKeyConstraint) {
+        $schemaName = $arr[0];
+        $tableName = $arr[1];
+        $grammar = $connection->getSchemaGrammar();
+
+        $keys = $connection->getPostProcessor()->processForeignKeys(
+            $connection->selectFromWriteConnection(
+                $grammar->compileForeignKeys($schemaName, $tableName)
+            )
+        );
+
+        foreach ($keys as $foreignKeyConstraint) {
             foreach ($foreignKeyConstraint['columns'] as $columnName) {
                 $this->foreignKeyConstraintsColumns[] = $columnName;
             }
