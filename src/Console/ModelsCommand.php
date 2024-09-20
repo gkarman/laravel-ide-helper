@@ -46,7 +46,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Throwable;
 
-class PhpDocCommand extends Command
+class ModelsCommand extends Command
 {
     protected const RELATION_TYPES = [
         'hasMany' => HasMany::class,
@@ -129,7 +129,6 @@ class PhpDocCommand extends Command
      */
     public function handle()
     {
-//        dd(123);
         $this->filename = $this->laravel['config']->get('ide-helper.models_filename', '_ide_helper_models.php');
         $filename = $this->option('filename') ?? $this->filename;
         $this->write = $this->option('write');
