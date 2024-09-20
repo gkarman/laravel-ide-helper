@@ -133,10 +133,7 @@ class ModelsCommand extends Command
         $filename = $this->option('filename') ?? $this->filename;
         $this->write = $this->option('write');
         $this->write_mixin = $this->option('write-mixin');
-        $this->dirs = array_merge(
-            $this->laravel['config']->get('ide-helper.model_locations', []),
-            $this->option('dir')
-        );
+        $this->dirs = $this->option('dir');
         $model = $this->argument('model');
         $ignore = $this->option('ignore');
         $this->reset = $this->option('reset');
