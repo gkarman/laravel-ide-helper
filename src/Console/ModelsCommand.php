@@ -489,7 +489,9 @@ class ModelsCommand extends Command
         $table = $connection->getTablePrefix().$model->getTable();
         $arr = \explode('.', $table);
         $schemaName = $arr[0];
-        $tableName = $arr[1];
+        if (!isset($arr[1])) {
+            $arr[1] = $connection->getDatabaseName();
+        }
 
         $results = $connection->selectFromWriteConnection(
             $grammar->compileColumns($schemaName, $tableName)
