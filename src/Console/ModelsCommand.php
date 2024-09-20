@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands;
+namespace Barryvdh\LaravelIdeHelper\Console;
 
 use Barryvdh\LaravelIdeHelper\Contracts\ModelHookInterface;
 use Barryvdh\LaravelIdeHelper\Parsers\PhpDocReturnTypeParser;
